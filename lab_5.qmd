@@ -1,0 +1,709 @@
+---
+title: "lab_5"
+---
+
+```{r}
+library(sf)
+library(dplyr)
+library(spdep)
+library(tibble)
+library(ggplot2)
+library(tmap)
+library(patchwork)
+```
+
+```{r}
+# Read the file in
+df <- read_sf("gds-main/data/Liverpool/liv_lsoas.gpkg")
+plot(df)
+```
+
+```{r}
+# list all adjacent polygons for each polygon
+nb_q <- poly2nb(df, queen = TRUE) # Construct neighbours list from polygon list
+```
+
+```{r}
+head(nb_q)
+```
+
+```{r}
+w_queen <- nb2listw(nb_q, style = "B") # Create a spatial weights matrix using queen contiguity
+```
+
+```{r}
+summary(w_queen) # Display summary information about the spatial weights matrix
+```
+
+```{r}
+nb_q[[1]] # Access the neighbors of the first polygon in the list
+```
+
+```{r}
+149 %in% nb_q[[1]] # Check if district 149 is a neighbor of the first polygon in the list
+```
+
+```{r}
+length(w_queen$neighbours[[6]]) # Calculate the number of neighbors for the first polygon in the spatial weights matrix
+```
+
+```{r}
+# Get the number of neighbors for each element
+num_nb_q <- sapply(nb_q, function(x) length(x))
+
+# Create a dataframe with LSOA11CD and num_neighbors
+nb_counts_q <- data.frame(LSOA11CD = df$LSOA11CD, num_nb_q = num_nb_q)
+
+# Create a histogram of the number of queen neighbors
+hist(nb_counts_q$num_nb_q, breaks = 10, col = "blue", main = "Histogram of no. of queen neighbours", xlab = "No. of queen neighbours")
+```
+
+```{r}
+ # Extract the first row of the dataframe as 'obs1'
+obs1 <- df[1,]
+
+# Extract the rows corresponding to the neighbors of the first polygon using queen contiguity
+obs1_nb_q <- df[c(nb_q[[1]]),]
+```
+
+```{r}
+# Create a map for all the units in mistyrose3 
+rest_map <- tm_shape(df) +  
+  tm_borders(col = "black", lwd = 0.5) +  
+  tm_fill(col = "mistyrose3")  
+
+# Create a map for neighbors in steelblue4
+neighbors_map <- tm_shape(obs1_nb_q) +
+  tm_borders(col = "black", lwd = 0.5) +  
+  tm_fill(col = "steelblue4")  
+
+# Create a map for observation 1 in red2
+obs1_map <- tm_shape(obs1) +
+  tm_borders(col = "black", lwd = 0.5) + 
+  tm_fill(col = "red2")  
+
+# Combine all the maps, add compass, scale bar, and legend
+final_map_q <- rest_map + neighbors_map + obs1_map +
+  tm_compass(position = c("right", "top")) + 
+  tm_scale_bar(position = c("right", "bottom")) + 
+  tm_add_legend(type = "fill", col = c("red2", "steelblue4","mistyrose3"), 
+                labels = c("Observation 1", "Queen neighbourhood", "Rest of LSOAs"), title = "") + 
+  tm_layout(legend.text.size = 0.55, inner.margins = c(0.01, 0.1, 0.01, 0.05), 
+            legend.position = c(0.03,0.03), legend.width=0.55)
+```
+
+```{r}
+tmap_arrange(final_map_q)
+```
+
+```{r}
+nb_r <- poly2nb(df, queen = FALSE) # Construct neighbors list using rook contiguity
+```
+
+```{r}
+# Create a spatial weights matrix using rook contiguity
+w_rook <- nb2listw(nb_r, style = "B") 
+# Display summary information about the spatial weights matrix
+summary(w_rook) 
+```
+
+```{r}
+# Create k-Nearest Neighbors list with k=5
+nb_knn <- knearneigh(st_coordinates(st_centroid(df)), k=5) 
+```
+
+```{r}
+# Convert k-Nearest Neighbors list to a spatial weights matrix
+w_knn <- knn2nb(nb_knn)
+
+summary(w_knn)
+```
+
+```{r}
+# Extract the first row of the dataframe as 'obs1'
+obs1 <- df[1,]
+
+# Extract the rows corresponding to the k-Nearest Neighbors of the first centroid
+obs1_nb_knn <- df[c(w_knn[[1]]),]
+```
+
+```{r}
+# Create a map for all the units in mistyrose3 
+rest_map <- tm_shape(df) +  
+  tm_borders(col = "black", lwd = 0.5) +  
+  tm_fill(col = "mistyrose3")  
+
+# Create a map for neighbors in steelblue4
+neighbors_map <- tm_shape(obs1_nb_knn) +
+  tm_borders(col = "black", lwd = 0.5) +  
+  tm_fill(col = "steelblue4")  
+
+# Create a map for observation 1 in red2
+obs1_map <- tm_shape(obs1) +
+  tm_borders(col = "black", lwd = 0.5) + 
+  tm_fill(col = "red2")  
+
+# Combine all the maps, add compass, scale bar, and legend
+final_map_knn <- rest_map + neighbors_map + obs1_map +
+  tm_compass(position = c("right", "top")) + 
+  tm_scale_bar(position = c("right", "bottom")) + 
+  tm_add_legend(type = "fill", col = c("red2", "steelblue4","mistyrose3"), 
+                labels = c("Observation 1", "k=5 nearest neighbours", "Rest of LSOAs"), title = "") + 
+  tm_layout(legend.text.size = 0.55, inner.margins = c(0.01, 0.1, 0.01, 0.05), 
+            legend.position = c(0.03,0.03), legend.width=0.55)
+```
+
+```{r}
+tmap_arrange(final_map_knn)
+```
+
+```{r}
+# Create a distance-based neighbors list with a minimum distance of 0 and maximum distance of 2000 meters
+nb_d <- dnearneigh(st_coordinates(st_centroid(df)), d1=0, d2=2000)
+```
+
+```{r}
+# Create a spatial weights matrix using distance-based neighbors with binary style
+w_d <- nb2listw(nb_d, style = "B")
+```
+
+```{r}
+obs1 <- df[2,]
+obs1_nb_d <- df[c(nb_d[[2]]),]
+```
+
+```{r}
+# Create a map for all the units in mistyrose3 
+rest_map <- tm_shape(df) +  
+  tm_borders(col = "black", lwd = 0.5) +  
+  tm_fill(col = "mistyrose3")  
+
+# Create a map for neighbors in steelblue4
+neighbors_map <- tm_shape(obs1_nb_d) +
+  tm_borders(col = "black", lwd = 0.5) +  
+  tm_fill(col = "steelblue4")  
+
+# Create a map for observation 1 in red2
+obs1_map <- tm_shape(obs1) +
+  tm_borders(col = "black", lwd = 0.5) + 
+  tm_fill(col = "red2")  
+
+# Combine all the maps, add compass, scale bar, and legend
+final_map_d <- rest_map + neighbors_map + obs1_map +
+  tm_compass(position = c("right", "top")) + 
+  tm_scale_bar(position = c("right", "bottom")) + 
+  tm_add_legend(type = "fill", col = c("red2", "steelblue4","mistyrose3"), 
+                labels = c("Observation 1", "Distance neighbourhood", "Rest of LSOAs"), title = "") + 
+  tm_layout(legend.text.size = 0.55, inner.margins = c(0.01, 0.1, 0.01, 0.05), 
+            legend.position = c(0.03,0.03), legend.width=0.55)
+```
+
+```{r}
+tmap_arrange(final_map_q, final_map_knn, final_map_d)
+```
+
+```{r}
+# Create an inverse distance-based neighbors list with a minimum distance of 0 and maximum distance of 2000
+nb_d_inverse <- dnearneigh(st_coordinates(st_centroid(df)), d1=0, d2=2000)
+```
+
+```{r}
+# Calculate distances between neighbors using the inverse distance-based neighbors list
+dist <- nbdists(nb_d_inverse, st_coordinates(st_centroid(df)), longlat = FALSE)
+```
+
+```{r}
+# Create a list of weights by taking the reciprocal of distances
+w_inverse <- lapply(dist, function(x) 1/(x))
+```
+
+```{r}
+w_inverse[[1]]
+```
+
+```{r}
+# Create an inverse distance-based neighbors list with a minimum distance of 0 and maximum distance of 2000
+nb_d_inverse <- dnearneigh(st_coordinates(st_centroid(df)), d1=0, d2=2000)
+```
+
+```{r}
+# Calculate distances between neighbors using the inverse distance-based neighbors list
+dist <- nbdists(nb_d_inverse, st_coordinates(st_centroid(df)), longlat = FALSE)
+```
+
+```{r}
+head(dist)
+```
+
+```{r}
+# Create a list of weights by taking the reciprocal of distances
+w_inverse <- lapply(dist, function(x) 1/(x))
+```
+
+```{r}
+w_inverse[[1]]
+```
+
+```{r}
+# Create a block weights matrix using MSOA11CD as block IDs and LSOA11CD as unit IDs
+w_block <- nb2blocknb(nb=NULL, df$MSOA11CD, row.names = df$LSOA11CD)
+```
+
+```{r}
+# Extract the first row of the dataframe as 'obs1'
+obs1 <- df[1,]
+
+# Extract the rows corresponding to the block neighbors of the first observation
+obs1_nb_block <- df[c(w_block[[1]]),]
+```
+
+```{r}
+# Create a map for the rest of the units in mistyrose3
+rest_map <- tm_shape(df) +  
+  tm_borders(col = "black", lwd = 0.5) +  
+  tm_fill(col = "mistyrose3") 
+
+# Create a map for block neighbors in steelblue4
+neighbors_map <- tm_shape(obs1_nb_block) +
+  tm_borders(col = "black", lwd = 0.5) +  
+  tm_fill(col = "steelblue4")
+
+# Create a map for observation 1 in red2
+obs1_map <- tm_shape(obs1) +
+  tm_borders(col = "black", lwd = 0.5) +  
+  tm_fill(col = "red2")  
+
+# Combine all the maps, add compass, scale bar, and legend
+final_map_block <- rest_map + neighbors_map + obs1_map +
+  tm_compass(position = c("right", "top")) + 
+  tm_scale_bar(position = c("right", "bottom")) + 
+  tm_add_legend(type = "fill", col = c("red2", "steelblue4","mistyrose3"), 
+                labels = c("Observation 1", "Block neighbourhood (same MSOA)", "Rest of LSOAs"), title = "") + 
+  tm_layout(legend.text.size = 0.65, inner.margins = c(0.1, 0.1, 0.02, 0.05), 
+            legend.position = c(0.03,0.03), legend.width=0.55)
+```
+
+```{r}
+final_map_block
+```
+
+```{r}
+# Subset the dataframe to get rows with matching MSOA11CD as observation 1
+df[df$MSOA11CD == obs1$MSOA11CD, ]
+```
+
+```{r}
+# Extract the rows corresponding to the block neighbors of the first observation
+df[c(w_block[[1]]),]
+```
+
+```{r}
+# Construct neighbors list using queen contiguity
+nb_q <- poly2nb(df, queen = TRUE)
+```
+
+```{r}
+# Create a binary spatial weights matrix using queen contiguity
+w_queen <- nb2listw(nb_q, style = "B")
+
+# Create a row-standardized spatial weights matrix using queen contiguity
+w_queen_std <- nb2listw(nb_q, style = "W")
+```
+
+```{r}
+# Display the binary weights for the first observation
+w_queen$weights[[1]]  
+```
+
+```{r}
+# Display the row-standardized weights for the first observation
+w_queen_std$weights[[1]] 
+```
+
+```{r}
+# Calculate the logarithm of the area of each polygon and add it as a new column named 'area'
+df$area <- log(as.vector(st_area(df)))
+```
+
+```{r}
+# Calculate the spatial lag of the (log of) 'area' variable using the row-standardized spatial weights matrix
+area.lag <- lag.listw(w_queen_std, df$area)
+```
+
+```{r}
+# Add the calculated spatial lag of 'area' as a new column named 'w_area'
+df$w_area <- area.lag
+```
+
+```{r}
+# Create a map displaying the 'area' variable
+area_map <- tm_shape(df) +
+  tm_borders(col = "black", lwd = 0.5) +
+  tm_fill("area", n=10, style = "quantile", title = "Area", palette = "YlGn") +
+  tm_compass(position = c("right", "top")) + 
+  tm_scale_bar(position = c("right", "bottom")) + 
+  tm_layout(legend.text.size = 0.55, inner.margins = c(0.1, 0.1, 0.02, 0.05), legend.position = c(0.03,0.03), legend.width=0.55)
+
+# Create a map displaying the spatially lagged 'area' variable
+w_area_map <- tm_shape(df) +
+  tm_borders(col = "black", lwd = 0.5) +
+  tm_fill("w_area", n=10, style = "quantile", title = "Lagged area", palette = "YlGn") +
+  tm_compass(position = c("right", "top")) + 
+  tm_scale_bar(position = c("right", "bottom")) + 
+  tm_layout(legend.text.size = 0.55, inner.margins = c(0.1, 0.1, 0.02, 0.05), legend.position = c(0.03,0.03), legend.width=0.55)
+
+# Arrange both maps side by side
+tmap_arrange(area_map, w_area_map)
+```
+
+```{r}
+# Create a Moran plot using ggplot2, adding a regression line accroding to a linear model
+moran_plot <- ggplot(df, aes(x=area, y=w_area)) + 
+  geom_point() +
+  geom_smooth(method=lm) +
+  labs(title="Moran plot", x="Area (log)", y = "Lagged area (log)")
+
+# Apply a minimal theme to the Moran plot
+moran_plot + theme_minimal()  
+```
+
+```{r}
+# Standardize the 'area' variable and add it as a new column named 'area_z'
+df$area_z <- (df$area - mean(df$area)) / sd(df$area)
+```
+
+```{r}
+# Calculate the spatial lag of the standardized 'area' variable
+area_z.lag <- lag.listw(w_queen_std, df$area_z)
+
+# Add the calculated spatial lag of standardized 'area' as a new column named 'w_area_z'
+df$w_area_z <- area_z.lag
+```
+
+```{r}
+# Create a standardized Moran plot using ggplot2
+moran_plot_z <- ggplot(df, aes(x=area_z, y=w_area_z)) + 
+  geom_point() +
+  geom_smooth(method=lm) +
+  geom_hline(aes(yintercept = 0)) +
+  geom_vline(aes(xintercept = 0)) +
+  labs(title="Standardised Moran plot", x="Area (log) z-score", y = "Lagged area (log) z-score")
+
+# Apply a minimal theme to the standardized Moran plot
+moran_plot_z + theme_minimal()  
+```
+
+```{r}
+library(sf)
+library(spdep)
+library(tmap)
+library(tmaptools)
+library(rosm)
+```
+
+```{r}
+nyc <- st_read('gds-main/data/NYC/NYC_tract_ACS2008_12.shp')
+```
+
+```{r}
+tm_shape(nyc) +  
+  tm_borders(col = "black", lwd = 0.5) +  
+  tm_fill(col = "skyblue2") +
+  tm_compass(position = c("left", "top")) + 
+  tm_scale_bar(position = c("right", "bottom")) 
+```
+
+```{r}
+# list all adjacent polygons for each polygon
+nb_q <- poly2nb(nyc, queen = TRUE) # Construct neighbours list from polygon list
+```
+
+```{r}
+w_queen <- nb2listw(nb_q, style = "B", zero.policy = TRUE)
+```
+
+```{r}
+length(w_queen$neighbours[[143]]) # Calculate the number of neighbors for the first polygon in the spatial weights matrix
+```
+
+```{r}
+ # Extract the first row of the dataframe as 'obs1'
+obs1 <- nyc[143,]
+
+# Extract the rows corresponding to the neighbors of the first polygon using queen contiguity
+obs1_nb_q <- nyc[c(nb_q[[143]]),]
+```
+
+```{r}
+# Create a map for all the units in mistyrose3 
+rest_map <- tm_shape(nyc) +  
+  tm_borders(col = "black", lwd = 0.5) +  
+  tm_fill(col = "mistyrose3")  
+
+# Create a map for neighbors in steelblue4
+neighbors_map <- tm_shape(obs1_nb_q) +
+  tm_borders(col = "black", lwd = 0.5) +  
+  tm_fill(col = "steelblue4")  
+
+# Create a map for observation 1 in red2
+obs1_map <- tm_shape(obs1) +
+  tm_borders(col = "black", lwd = 0.5) + 
+  tm_fill(col = "red2")  
+
+# Combine all the maps, add compass, scale bar, and legend
+final_map_q <- rest_map + neighbors_map + obs1_map +
+  tm_compass(position = c("right", "top")) + 
+  tm_scale_bar(position = c("right", "bottom")) + 
+  tm_add_legend(type = "fill", col = c("red2", "steelblue4","mistyrose3"), 
+                labels = c("Observation 1", "Queen neighbourhood", "Rest of LSOAs"), title = "") + 
+  tm_layout(legend.text.size = 0.55, inner.margins = c(0.01, 0.1, 0.01, 0.05), 
+            legend.position = c(0.03,0.03), legend.width=0.55)
+```
+
+```{r}
+final_map_q
+```
+
+-   Create a block spatial weights matrix where every tract is connected to other tracts in the same borough. For that, use the borocode column of the nyc table.
+
+```{r}
+# Assuming nyc_spdf is your SpatialPolygonsDataFrame
+nyc_nb <- poly2nb(nyc, queen = TRUE, row.names = nyc$borocode)
+```
+
+```{r}
+w_queen_nyc <- nb2listw(nyc_nb, style = "B", zero.policy = TRUE)
+```
+
+```{r}
+ # Extract the first row of the dataframe as 'obs1'
+obs1 <- nyc[143,]
+
+# Extract the rows corresponding to the neighbors of the first polygon using queen contiguity
+obs1_nb_q <- nyc[c(nyc_nb[[143]]),]
+```
+
+```{r}
+# Create a map for all the units in mistyrose3 
+rest_map <- tm_shape(nyc) +  
+  tm_borders(col = "black", lwd = 0.5) +  
+  tm_fill(col = "mistyrose3")  
+
+# Create a map for neighbors in steelblue4
+neighbors_map <- tm_shape(obs1_nb_q) +
+  tm_borders(col = "black", lwd = 0.5) +  
+  tm_fill(col = "steelblue4")  
+
+# Create a map for observation 1 in red2
+obs1_map <- tm_shape(obs1) +
+  tm_borders(col = "black", lwd = 0.5) + 
+  tm_fill(col = "red2")  
+
+# Combine all the maps, add compass, scale bar, and legend
+final_map_q <- rest_map + neighbors_map + obs1_map +
+  tm_compass(position = c("right", "top")) + 
+  tm_scale_bar(position = c("right", "bottom")) + 
+  tm_add_legend(type = "fill", col = c("red2", "steelblue4","mistyrose3"), 
+                labels = c("Observation 1", "Queen neighbourhood", "Rest of LSOAs"), title = "") + 
+  tm_layout(legend.text.size = 0.55, inner.margins = c(0.01, 0.1, 0.01, 0.05), 
+            legend.position = c(0.03,0.03), legend.width=0.55)
+```
+
+```{r}
+final_map_q
+```
+
+```{r}
+head(nyc$borocode)
+```
+
+## **Task II: Japanese cities**
+
+```{r}
+jp_cities <- st_read("gds-main/data/JPN/JPN_core_commuting.shp")
+```
+
+```{r}
+base = osm.raster(jp_cities)
+
+tm_shape(base) + tm_rgb() +
+  tm_shape(jp_cities) +  
+  tm_borders(col = "black", lwd = 0.5) +  
+  tm_fill(col = "coral1") +
+  tm_compass(position = c("left", "top")) + 
+  tm_scale_bar(position = c("right", "bottom")) 
+```
+
+```{r}
+jp_cities <- st_transform(jp_cities, "EPSG:2459")
+```
+
+```{r}
+jp_centroids = st_centroid(jp_cities)
+```
+
+```{r}
+tm_shape(jp_cities) +  
+  tm_borders(col = "black", lwd = 0.5) +  
+  tm_fill(col = "coral1") +
+  tm_shape(jp_centroids) +
+  tm_dots()+
+  tm_compass(position = c("left", "top")) + 
+  tm_scale_bar(position = c("right", "bottom")) 
+```
+
+-   Generate a spatial weights matrix with five nearest neighbors
+
+```{r}
+nb_knn_japan <- knearneigh(st_coordinates(st_centroid(jp_cities)), k=5) 
+```
+
+```{r}
+#Spatial weight matrix
+
+w_knn_japan <- knn2nb(nb_knn_japan)
+```
+
+```{r}
+# Extract the first row of the dataframe as 'obs1'
+obs1_japan <- jp_cities[1,]
+
+# Extract the rows corresponding to the k-Nearest Neighbors of the first centroid
+obs1_nb_knn_japan <- jp_cities[c(w_knn_japan[[1]]),]
+```
+
+```{r}
+# Create a map for all the units in mistyrose3 
+rest_map <- tm_shape(jp_cities) +  
+  tm_borders(col = "black", lwd = 0.5) +  
+  tm_fill(col = "mistyrose3")  
+
+# Create a map for neighbors in steelblue4
+neighbors_map <- tm_shape(obs1_nb_knn_japan) +
+  tm_borders(col = "black", lwd = 0.5) +  
+  tm_fill(col = "steelblue4")  
+
+# Create a map for observation 1 in red2
+obs1_map <- tm_shape(obs1_japan) +
+  tm_borders(col = "black", lwd = 0.5) + 
+  tm_fill(col = "red2")  
+
+# Combine all the maps, add compass, scale bar, and legend
+final_map_knn <- rest_map + neighbors_map + obs1_map +
+  tm_compass(position = c("right", "top")) + 
+  tm_scale_bar(position = c("right", "bottom")) + 
+  tm_add_legend(type = "fill", col = c("red2", "steelblue4","mistyrose3"), 
+                labels = c("Observation 1", "k=5 nearest neighbours", "Rest of LSOAs"), title = "") + 
+  tm_layout(legend.text.size = 0.55, inner.margins = c(0.01, 0.1, 0.01, 0.05), 
+            legend.position = c(0.03,0.03), legend.width=0.55)
+```
+
+```{r}
+final_map_knn
+```
+
+-   Generate a spatial weights matrix with a 100km distance band
+
+```{r}
+# Create a distance-based neighbors list with a minimum distance of 0 and maximum distance of 2000 meters
+nb_d_japan <- dnearneigh(st_coordinates(st_centroid(jp_cities)), d1=0, d2=100000)
+```
+
+```{r}
+sfdf_km <- st_transform(jp_cities, "+proj=longlat +datum=WGS84 +units=km")
+```
+
+```{r}
+# Create a distance-based neighbors list with a minimum distance of 0 and maximum distance of 100 km
+nb_d_japan_km <- dnearneigh(st_coordinates(st_centroid(sfdf_km)), d1=0, d2=100)
+```
+
+```{r}
+nb_d_japan_km
+```
+
+```{r}
+# Create a spatial weights matrix using distance-based neighbors with binary style
+w_d <- nb2listw(nb_d_japan_km, style = "B")
+```
+
+```{r}
+obs1 <- sfdf_km[1,]
+obs1_nb_d <- sfdf_km[c(nb_d_japan_km[[1]]),]
+```
+
+```{r}
+# Create a map for all the units in mistyrose3 
+rest_map <- tm_shape(sfdf_km) +  
+  tm_borders(col = "black", lwd = 0.5) +  
+  tm_fill(col = "mistyrose3")  
+
+# Create a map for neighbors in steelblue4
+neighbors_map <- tm_shape(obs1_nb_d) +
+  tm_borders(col = "black", lwd = 0.5) +  
+  tm_fill(col = "steelblue4")  
+
+# Create a map for observation 1 in red2
+obs1_map <- tm_shape(obs1) +
+  tm_borders(col = "black", lwd = 0.5) + 
+  tm_fill(col = "red2")  
+
+# Combine all the maps, add compass, scale bar, and legend
+final_map_d <- rest_map + neighbors_map + obs1_map +
+  tm_compass(position = c("right", "top")) + 
+  tm_scale_bar(position = c("right", "bottom")) + 
+  tm_add_legend(type = "fill", col = c("red2", "steelblue4","mistyrose3"), 
+                labels = c("Observation 1", "Distance neighbourhood", "Rest of LSOAs"), title = "") + 
+  tm_layout(legend.text.size = 0.55, inner.margins = c(0.01, 0.1, 0.01, 0.05), 
+            legend.position = c(0.03,0.03), legend.width=0.55)
+
+final_map_d
+```
+
+```{r}
+row_index_tokyo <- which(jp_cities$fuaname == "Tokyo")
+row_index_tokyo
+```
+
+```{r}
+tokyo_row <- jp_cities[23, ]
+```
+
+```{r}
+nb_d_tokyo <- dnearneigh(st_coordinates(st_centroid(tokyo_row)), d1=0, d2=100000)
+```
+
+```{r}
+obs1 <- jp_cities[23,]
+obs1_nb_d <- jp_cities[c(nb_d_japan[[23]]),]
+```
+
+```{r}
+# Create a map for all the units in mistyrose3 
+rest_map <- tm_shape(jp_cities) +  
+  tm_borders(col = "black", lwd = 0.5) +  
+  tm_fill(col = "mistyrose3")  
+
+# Create a map for neighbors in steelblue4
+neighbors_map <- tm_shape(obs1_nb_d) +
+  tm_borders(col = "black", lwd = 0.5) +  
+  tm_fill(col = "steelblue4")  
+
+# Create a map for observation 1 in red2
+obs1_map <- tm_shape(obs1) +
+  tm_borders(col = "black", lwd = 0.5) + 
+  tm_fill(col = "red2")  
+
+# Combine all the maps, add compass, scale bar, and legend
+final_map_d <- rest_map + neighbors_map + obs1_map +
+  tm_compass(position = c("right", "top")) + 
+  tm_scale_bar(position = c("right", "bottom")) + 
+  tm_add_legend(type = "fill", col = c("red2", "steelblue4","mistyrose3"), 
+                labels = c("Observation 1", "Distance neighbourhood", "Rest of LSOAs"), title = "") + 
+  tm_layout(legend.text.size = 0.55, inner.margins = c(0.01, 0.1, 0.01, 0.05), 
+            legend.position = c(0.03,0.03), legend.width=0.55)
+```
+
+```{r}
+final_map_d
+```
